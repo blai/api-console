@@ -5,13 +5,45 @@
     return {
       restrict: 'E',
       templateUrl: 'directives/documentation.tpl.html',
-      replace: true,
+      scope: {
+        methodInfo: '=',
+        securitySchemes: '='
+      },
       controller: ['$scope', function($scope) {
+        function getResponseInfo() {
+          var responseInfo = {};
+          var responses    = $scope.methodInfo.responses;
+
+          if (responses) {
+            Object.keys(responses).map(function (key) {
+              if(responses[key] && typeof responses[key].body !== 'undefined' && responses[key].body()) {
+                var bodies = {};
+                responses[key].body().forEach(function (aBody) {
+                  bodies[aBody.name()] = aBody;
+                });
+                responseInfo[key] = {};
+
+                Object.keys(bodies).sort().reverse().map(function (type) {
+                  responseInfo[key][type] = {
+                    example: RAML.Transformer.transformValue(bodies[type].example()),
+                    schema: RAML.Transformer.transformValue(bodies[type].schema()),
+                  };
+                  responseInfo[key].currentType = type;
+                });
+              }
+            });
+          }
+
+          return responseInfo;
+        }
+
         var defaultSchemaKey = Object.keys($scope.securitySchemes).sort()[0];
         var defaultSchema    = $scope.securitySchemes[defaultSchemaKey];
 
         $scope.markedOptions = RAML.Settings.marked;
         $scope.documentationSchemeSelected = defaultSchema;
+        $scope.responseInfo = getResponseInfo();
+        $scope.documentationEnabled = true;
 
         $scope.isSchemeSelected = function isSchemeSelected(scheme) {
           return scheme.id === $scope.documentationSchemeSelected.id;
@@ -46,29 +78,6 @@
             $scope.currentStatusCode = $scope.methodInfo.responseCodes[0];
           }
         });
-
-        function beautify(body, contentType) {
-          if(contentType.indexOf('json')) {
-            body = vkbeautify.json(body, 2);
-          }
-
-          if(contentType.indexOf('xml')) {
-            body = vkbeautify.xml(body, 2);
-          }
-
-          return body;
-        }
-
-        $scope.getBeatifiedExample = function (value) {
-          var result = value;
-
-          try {
-            beautify(value, $scope.currentBodySelected);
-          }
-          catch (e) { }
-
-          return result;
-        };
 
         $scope.getColorCode = function (code) {
           return code[0] + 'xx';
@@ -188,13 +197,13 @@
           return value === $scope.currentBodySelected;
         };
 
-        $scope.$watch('currentBodySelected', function (value) {
-          var $container = jQuery('.raml-console-request-body-heading');
-          var $elements  = $container.find('span');
-
-          $elements.removeClass('raml-console-is-active');
-          $container.find('.raml-console-body-' + $scope.getBodyId(value)).addClass('raml-console-is-active');
-        });
+        // $scope.$watch('currentBodySelected', function (value) {
+        //   var $container = jQuery('.raml-console-request-body-heading');
+        //   var $elements  = $container.find('span');
+        //
+        //   $elements.removeClass('raml-console-is-active');
+        //   $container.find('.raml-console-body-' + $scope.getBodyId(value)).addClass('raml-console-is-active');
+        // });
 
         $scope.showSchema = function ($event) {
           var $this   = jQuery($event.currentTarget);
